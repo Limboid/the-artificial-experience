@@ -4,29 +4,33 @@ The `artificial-experience` is a very general environment and also a library for
 
 1. **Inputs and outputs are labeled by modality**. Each interaction step input or output is a Python `dict` object with `Modality` object keys and `Tensor` or `None` values. A `Modality` defines a combination of `structure` (set, grid, or graph), `representation` (binary, categorical, integer, real), and `context` ("natural", "computer", or other natural language tag).
 
-2. **Datasets are wrapped into `DatasetEnv`s** 1 minibatch = 1 environment step. `DatasetEnv` tries to automatically guess modalities. An `AutoregressiveSupervisedDataset` transforms specified dataset modalities into a time shifted form appropriate for training an autoregressive model.
+2. **Datasets are wrapped into `DatasetEnv`s** 1 minibatch = 1 environment step. `DatasetEnv` tries to automatically guess modalities. Many supervised and self-supervised learning problems can be structured using this environment and a prediction-based learning objective.
 
-3. **Environments are wrapped into `SynEnvironment`s** which present a single  interaction sequence spanning multiple environments. Inter-environment transitions be be triggered on `done` (defualt) or by a custom `should_transition` function. When transitioning, the `SynEnvironment` first calls a `transition_fn` function with the new environment observation and action spaces which can be used to add new encoders and decoders to the policy. It then runs a few interaction steps where the agent observes a natural language instruction (e.g. `predict the class of images on imagenet`) on the input key `'text:instruction'` associated with the new environment. Finally, interaction begins in the new environment.
+3. **Environments are wrapped into `SynEnv`s** which present a single  interaction sequence spanning multiple environments. Inter-environment transitions be be triggered on `done` (defualt) or by a custom `should_transition` function. When transitioning, the `SynEnv` first calls a `transition_fn` function with the new environment observation and action spaces which can be used to add new encoders and decoders to the policy. It then runs a few interaction steps where the agent observes a natural language instruction (e.g. `predict the class of images on imagenet`) on the input key `'text:instruction'` associated with the new environment. Finally, interaction begins in the new environment.
 
-4. **Other environments compose long-term lifelong learning pipelines**.
-    - `AugmentEnvironmentWrapper` augments specified inputs and outputs.
-    - `DropoutEnvironmentWrapper` is an `AugmentEnvironmentWrapper` that occasionally replaces an input or output value with 0 or another specified value.
-    - `NoisyEnvironmentWrapper` is an `AugmentEnvironmentWrapper` that adds noise to an input or output value.
-    - `RepeatEnvironmentWrapper` is an `AugmentEnvironmentWrapper` that occasionally repeats an input or output value for multiple interaction steps.
-    - `DropValueEnvironment` is an `AugmentEnvironmentWrapper` that occasionally drops an input or output key-value from the dictionary.
-    - `MetaEnvironmentWrapper` directly includes environment reward in the observation space. If the previous environment was a `SynEnvironmentWrapper`, the `MetaEnvironmentWrapper` can optionally provide a set of rewards.
-    - `ObserveActionsEnvironmentWrapper` feeds the agent's actions into the next interaction step observation. 
-    - `PredictInputsEnvironmentWrapper` expects and rewards agents for predicting the next input values.
-    - `StaticTimescaledEnvironmentWrapper` allows tuning the amount of 'ponder' steps that a model gets between external environment interactions. Inputs can be dropped or repeated. 
-    - `DynamicTimescaledEnvironmentWrapper` is like `StaticTimescaledEnvironmentWrapper` but it gives the agent the ability to observe and modify its external environment interaction timescale.
-    - `InterleaveEnvironments` interleaves interactions from a list of environments with an arbitrary interleave pattern (e.g. `[0,1,2,0,1,2,0,1,2]`).
-    - `PenalizeComputeWrapper` decreases reward proportional to the amount of compute used since the last interaction. This penalizes the agent (such as in a DynamicTimescaledEnvironmentWrapper) for using too much compute.
+4. **Environments compose long-term lifelong learning pipelines**. Each environment is a gym-compatible object and can be wrapped into pipelines and networks.
+    - `Interleave` is a high level version of `SynEnvironment` that interleaves interactions from a list of environments with an arbitrary interleave pattern. For example, the interleave patten `[EnvA, EnvB, EnvC, EnvB, EnvC]` takes the first interaction from `EnvA`, the second from `EnvB`, the third from `EnvC`, the fourth from `EnvB`, and the fifth from `EnvC`. The environment is done when either the first or all sub-environments are done. 
+    - `Multitasking` makes an agent interact in multiple environments simultaneously. The environment is done when either the first or all sub-environments are done.
+    - `Teacher` occasionally reverts the wrapped environment's state to a previous state where performance maximally increased. It can buffer with a rolling history, top k, or arbitrary `should_store_state` function. This wrapper is useful for implementing Go-Explore-type algorithms.
+    - `Augment` is a base class for wrapper environments that augment specific inputs and outputs.
+    - `Dropout` is an `Augment` environment wrapper that occasionally replaces an input or output value with 0 or another specified value.
+    - `Noisy` is an `Augment` environment wrapper that adds noise to an input or output value.
+    - `Repeat` is an `Augment` environment wrapper that occasionally repeats an input or output value for multiple interaction steps.
+    - `DropKeyValue` is an `Augment` environment wrapper that occasionally drops an input or output value *and key* from the dictionary.
+    - `ObserveReward` directly includes wrapped environment's reward in the observation space.
+    - `Advantage` directly includes the wrapped environment's Nth-order reward advantage in the observation space.
+    - `ObserveActions` feeds the agent's actions into the next interaction step observation. 
+    - `PredictInputs` expects and rewards agents for predicting the next input values.
+    - `StaticTimescaled` allows tuning the amount of 'ponder' steps that a model gets between external environment interactions. Inputs can be dropped or repeated. Outputs can be averaged, max pooled, min pooled, randomly selected, or last index selected along the time dimension.
+    - `DynamicTimescaled` is like `StaticTimescaled` but it gives the agent the ability to observe and modify its external environment interaction timescale.
+    - `PenalizeCompute` decreases reward proportional to the amount of compute used since the last interaction. This penalizes the agent (such as in a `DynamicTimescaled`) for using too much compute.
 
 **Suggestions for agents**
 - Maintain reccurent states across transitions to learn meta-learning.
 - Give the recurrent state strong expressive potential over the activation landscape.
 - Only make architecture changes (new encoders and decoders) when absolutely necessary
-- Occasionally train on input prediction error supervisedly in between training epochs. 
+- Occasionally train on input prediction error supervisedly in between training epochs.
+- Try to put the 1st-order optimizer inside your model.
 
 ## Getting Started
 

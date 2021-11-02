@@ -1,6 +1,6 @@
 from base_env import Env
 
-class SynEnvWrapper(Env):
+class SynEnv(Env):
 
     class EnvTransitionFunctions:
 
