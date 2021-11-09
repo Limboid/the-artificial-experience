@@ -1,6 +1,6 @@
 # The Artificial Experience
 
-It's time to give artificial intelligence a taste of reality. The `artificial-experience` is a library to facilitate training and evaluating models, optimziers, and training paradigms and pipelines across dozens of tasks, domains, dataset loaders, environments, and hubs simultaneously, lifelong, and in-context. This library also provides a simple `ArtificialExperience` environment and that can be used quickly run AGI experiments:
+It's time to give artificial intelligence a taste of reality. The `artificial-experience` is a library to facilitate training and evaluating models, optimziers, and training paradigms and pipelines across dozens of tasks, domains, dataset loaders, environments, and hubs simultaneously, lifelong, and in-context. This library also provides a highly complex, multi-task, open-world learning environment the `ArtificialExperience` which can be used quickly run AGI experiments:
 ```python
 import artificial_experience as ae
 
@@ -9,17 +9,17 @@ env = ae.ArtificialExperience()
 # `env` is a `dm_env.DmEnv` instance.
 timestep = env.reset()
 while True:
-    action = agent.step(timestep)
+    action = agent.forward(timestep.observation)
     timestep = env.step(action)
     # timestep is a `TimeStep` namedtuple  with fields (step_type, reward, discount, observation)
 ```
 To unify so many diverse machine learning approaches, the `artificial-experience` enforces a few key concepts:
 
-1. **Inputs and outputs are labeled by modality**. Each observation and action is a Python `dict` object with `Modality` object keys and `Tensor` or `None` values. A `Modality` defines a combination of `structure` (flat, set, sequence, grid, or graph), `representation` (binary, categorical, integer, real), and `context` ("natural", "computer", or other natural language tag).
+1. **Inputs and outputs are labeled by modality**. Each observation and action is a Python `dict` object with `Tensor` or `None` values. Environments also have a dictionary of `Modality` objects which define a combination of `structure` (flat, set, sequence, grid, or graph), `representation` (binary, categorical, integer, real), and `context` ("natural", "computer", or other natural language tag) that can be used to determine network architecture.
 
-2. **Datasets are wrapped into `DatasetEnv`s** 1 minibatch = 1 environment step. `DatasetEnv` tries to automatically guess modalities, but you can override the observation and action structure. Many supervised and self-supervised learning problems can be structured using this environment and a prediction-based learning objective.
+2. **Datasets are wrapped into `DatasetEnv`s** 1 minibatch = 1 environment step. For supervised datasets, agents observe both labels and targets simultaneously. NOTE: the environment doesn't provide an external reward by default; your agent should train itself given only x and y. `DatasetEnv` tries to automatically guess modalities, but you can override the observation and action structure. Many supervised and self-supervised learning problems can be structured using this environment and a prediction-based learning objective.
 
-3. **Environments are wrapped into `SynEnv`s** which present a single  interaction sequence spanning multiple environments and with multiple environments presented in separate batch samples of each interaction step. Inter-environment transitions can be triggered when all environments are done (defualt) or by a custom `should_transition` function. When transitioning, the `SynEnv` first calls a `transition_fn` function with the new environment observation and action spaces which can be used to add new encoders and decoders to the policy. It then runs a few interaction steps where the agent observes a natural language instruction (e.g. `predict the class of images on imagenet`) on the input key `'text:instruction'` associated with the new environment. Finally, interaction begins in the new environment.
+3. **Environments are wrapped into `SynEnv`s** which presents a single batched interaction sequence spanning multiple environments staggered along the batch and time axis. `SynEnv` maintains a separate running environment on each of its batch indices. Agents can select when and which environment to transition to by observing a set of `all_environments` and a sequence of `current_environments` and producing a sequence of `next_environments` on each timestep. Whenever an element of `next_environment` is not `None`, the `SynEnv` replaces the environment on that respective batch axis. Environments are not presented to the agent whenever they are done. Whenever an environment changes, the `SynEnv` calls a `transition_fn` which developers can supply to add input and output modalities to the policy. The `SynEnv` can optionally present a few interaction steps where the agent observes a natural language instruction (e.g. `predict the class of images on imagenet`) on the input key `'text:instruction'` associated with the new environment. Finally, interaction begins in the new environment.
 
 4. **Environments compose lifelong learning pipelines**. Each environment is a `dm_env` and can be wrapped into pipelines and networks.
     - `Interleave` is a high level version of `SynEnvironment` that interleaves interactions from a list of environments with an arbitrary interleave pattern. For example, the interleave patten `[EnvA, EnvB, EnvC, EnvB, EnvC]` takes the first interaction from `EnvA`, the second from `EnvB`, the third from `EnvC`, the fourth from `EnvB`, and the fifth from `EnvC`. The environment is done when either the first or all sub-environments are done. 
@@ -40,6 +40,8 @@ To unify so many diverse machine learning approaches, the `artificial-experience
     - `PenalizeCompute` decreases reward proportional to the amount of compute used since the last interaction. This penalizes the agent (such as in a `DynamicTimescaled`) for using too much compute.
     - `ReplayBuffer`: a wrapper that stores and replays observation-action-reward trajectories. Can save/load from disk. Extendable for real-time monitoring.
     - `Lambda` allows arbitrary code to modify the observations and actions as they are passed along the pipeline.
+
+5. **The `ArtificialExperience` provides a ready-made pipeline of environments and datasets to train on**.
 
 ## Suggestions for developing general agents
 - Get a good training pipeline established including sanity checks with personal qualitative observation.
