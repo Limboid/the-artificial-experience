@@ -19,7 +19,7 @@ To unify so many diverse machine learning approaches, the `artificial-experience
 
 2. **Datasets are wrapped into `DatasetEnv`s** 1 minibatch = 1 environment step. `DatasetEnv` tries to automatically guess modalities, but you can override the observation and action structure. Many supervised and self-supervised learning problems can be structured using this environment and a prediction-based learning objective.
 
-3. **Environments are wrapped into `SynEnv`s** which present a single  interaction sequence spanning multiple environments. Inter-environment transitions be be triggered on `done` (defualt) or by a custom `should_transition` function. When transitioning, the `SynEnv` first calls a `transition_fn` function with the new environment observation and action spaces which can be used to add new encoders and decoders to the policy. It then runs a few interaction steps where the agent observes a natural language instruction (e.g. `predict the class of images on imagenet`) on the input key `'text:instruction'` associated with the new environment. Finally, interaction begins in the new environment.
+3. **Environments are wrapped into `SynEnv`s** which present a single  interaction sequence spanning multiple environments and with multiple environments presented in separate batch samples of each interaction step. Inter-environment transitions can be triggered when all environments are done (defualt) or by a custom `should_transition` function. When transitioning, the `SynEnv` first calls a `transition_fn` function with the new environment observation and action spaces which can be used to add new encoders and decoders to the policy. It then runs a few interaction steps where the agent observes a natural language instruction (e.g. `predict the class of images on imagenet`) on the input key `'text:instruction'` associated with the new environment. Finally, interaction begins in the new environment.
 
 4. **Environments compose lifelong learning pipelines**. Each environment is a `dm_env` and can be wrapped into pipelines and networks.
     - `Interleave` is a high level version of `SynEnvironment` that interleaves interactions from a list of environments with an arbitrary interleave pattern. For example, the interleave patten `[EnvA, EnvB, EnvC, EnvB, EnvC]` takes the first interaction from `EnvA`, the second from `EnvB`, the third from `EnvC`, the fourth from `EnvB`, and the fifth from `EnvC`. The environment is done when either the first or all sub-environments are done. 
@@ -34,11 +34,12 @@ To unify so many diverse machine learning approaches, the `artificial-experience
     - `Advantage` directly includes the wrapped environment's Nth-order reward advantage in the observation space.
     - `ObserveActions` feeds the agent's actions into the next interaction step observation. 
     - `PredictInputs` expects and rewards agents for predicting the next input values.
-    - `ImaginaryEnv` uses a prediction agents to generate imaginary environments.
+    - `Imaginary` uses a prediction agents to generate imaginary environments.
     - `StaticTimescaled` allows tuning the amount of 'ponder' steps that a model gets between external environment interactions. Inputs can be dropped or repeated. Outputs can be averaged, max pooled, min pooled, randomly selected, or last index selected along the time dimension.
     - `DynamicTimescaled` is like `StaticTimescaled` but it gives the agent the ability to observe and modify its external environment interaction timescale.
     - `PenalizeCompute` decreases reward proportional to the amount of compute used since the last interaction. This penalizes the agent (such as in a `DynamicTimescaled`) for using too much compute.
     - `ReplayBuffer`: a wrapper that stores and replays observation-action-reward trajectories. Can save/load from disk. Extendable for real-time monitoring.
+    - `Lambda` allows arbitrary code to modify the observations and actions as they are passed along the pipeline.
 
 ## Suggestions for developing general agents
 - Get a good training pipeline established including sanity checks with personal qualitative observation.
